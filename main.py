@@ -1,15 +1,14 @@
 import os
 import torch
 import torch.nn as nn
-import numpy as np
-from torchvision import datasets, transforms, models
+from torchvision import datasets, transforms
 import copy
 import math
 import torch.utils.model_zoo as model_zoo
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 data_dir = "./datasets"
-model_save = "./resnet.pth"
+model_name = "resnet"
 num_classes = 5
 batch_size = 32
 num_epochs = 30
@@ -26,12 +25,12 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 pre_model = 'https://download.pytorch.org/models/resnet18-5c106cde.pth'
 
 
-
 def conv3x3(in_planes, out_planes, stride=1):
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=1, bias=False)
 
 
+# Resnet的基本结构。这种代码书写方式参考结构参考模型原作者，将模型分为两部分确实是个值得学习的地方
 class BasicBlock(nn.Module):
     expansion = 1
 
@@ -63,7 +62,8 @@ class BasicBlock(nn.Module):
         return out
 
 
-# ResNet的公共部分
+# ResNet的公共部分，后续可以加入ResNet34/50等
+
 class ResNet(nn.Module):
 
     def __init__(self, block, layers, num_classes=1000):
@@ -122,6 +122,8 @@ class ResNet(nn.Module):
 
         return x
 
+
+# ResNet18 num_classes为分类数 默认1000
 
 def resnet18(pretrained=False, **kwargs):
     model = ResNet(BasicBlock, [2, 2, 2, 2], **kwargs)
@@ -185,7 +187,7 @@ def train(model, train_loader, test_loader, loss_func, optimizer, num_epochs):
         print("round{}:\nTrain Loss: {}, Train Acc: {}".format(epoch, train_loss, train_acc))
         test_acc = test(model, test_loader, loss_func)
         # 选择模型记录
-        if (best_val_acc < test_acc):
+        if best_val_acc < test_acc:
             best_val_acc = test_acc
             best_model_params = copy.deepcopy(model.state_dict())
     model.load_state_dict(best_model_params)
@@ -199,7 +201,8 @@ def set_parameters_require_grad(model, grad):
             parameter.requires_grad = False
 
 
-def init_model(num_classes, grad, pretrained):
+# 建模
+def init_model(model_name, num_classes, grad, pretrained):
     model = resnet18(pretrained=pretrain)
     set_parameters_require_grad(model, grad)
 
@@ -209,6 +212,7 @@ def init_model(num_classes, grad, pretrained):
     return model
 
 
+# 读取数据集
 def get_datasets(data_dir, input_size, is_train_data):
     if (is_train_data):
         images = datasets.ImageFolder(os.path.join(data_dir, "train"),
@@ -246,7 +250,7 @@ def main():
     train_loader = torch.utils.data.DataLoader(train_images, batch_size=batch_size, shuffle=True)
     test_loader = torch.utils.data.DataLoader(test_images, batch_size=batch_size)
 
-    model = init_model(num_classes, grad, pretrain)
+    model = init_model(model_name, num_classes, grad, pretrain)
     model = model.to(device)
 
     require_update_params = get_require_updated_params(model, grad)
@@ -256,9 +260,9 @@ def main():
 
     if (training):
         model = train(model, train_loader, test_loader, loss_func, optimizer, num_epochs)
-        torch.save(model.state_dict(), model_save)
+        torch.save(model.state_dict(), "./resnet.pth")
     if (testing):
-        model.load_state_dict(torch.load(model_save))
+        model.load_state_dict(torch.load("./resnet.pth"))
         acc = test(model, test_loader, loss_func)
         print("Best Test Acc: {}".format(acc))
 
